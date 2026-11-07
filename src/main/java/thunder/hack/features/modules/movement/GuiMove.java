@@ -2,6 +2,7 @@ package thunder.hack.features.modules.movement;
 
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.gui.screen.ChatScreen;
+import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
@@ -17,6 +18,7 @@ import thunder.hack.utility.player.MovementUtility;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class GuiMove extends Module {
@@ -31,11 +33,62 @@ public class GuiMove extends Module {
     private final Queue<ClickSlotC2SPacket> storedClicks = new LinkedList<>();
     private AtomicBoolean pause = new AtomicBoolean();
 
+    // FunTime mode state
+    private final Queue<ClickSlotC2SPacket> funQueue = new ConcurrentLinkedQueue<>();
+    private boolean funWasOpen;
+    private boolean funResync;
+    private long funCloseTime;
+
+    private KeyBinding[] moveKeys() {
+        return new KeyBinding[]{mc.options.forwardKey, mc.options.backKey, mc.options.leftKey, mc.options.rightKey, mc.options.jumpKey, mc.options.sprintKey};
+    }
+
+    private void syncKeys() {
+        for (KeyBinding k : moveKeys())
+            k.setPressed(isKeyPressed(InputUtil.fromTranslationKey(k.getBoundKeyTranslationKey()).getCode()));
+    }
+
+    private void flushFunQueue() {
+        new Thread(() -> {
+            try {
+                Thread.sleep(80);
+            } catch (InterruptedException ignored) {
+                return;
+            }
+            ClickSlotC2SPacket p;
+            while ((p = funQueue.poll()) != null)
+                sendPacket(p);
+        }).start();
+    }
+
     @Override
     public void onUpdate() {
+        if (clickBypass.is(Bypass.FunTime)) {
+            boolean invOpen = mc.currentScreen instanceof InventoryScreen;
+            if (invOpen) {
+                funWasOpen = true;
+            } else if (funWasOpen) {
+                funWasOpen = false;
+                funCloseTime = System.currentTimeMillis();
+                flushFunQueue();
+            }
+
+            // after closing: stand still while queued clicks are flushed
+            if (!invOpen && !funQueue.isEmpty() && System.currentTimeMillis() - funCloseTime < 100) {
+                for (KeyBinding k : moveKeys())
+                    k.setPressed(false);
+                funResync = true;
+                return;
+            }
+
+            if (funResync && mc.currentScreen == null) {
+                syncKeys();
+                funResync = false;
+            }
+        }
+
         if (mc.currentScreen != null && !(mc.currentScreen instanceof ChatScreen)) {
-            for (KeyBinding k : new KeyBinding[]{mc.options.forwardKey, mc.options.backKey, mc.options.leftKey, mc.options.rightKey, mc.options.jumpKey, mc.options.sprintKey})
-                k.setPressed(isKeyPressed(InputUtil.fromTranslationKey(k.getBoundKeyTranslationKey()).getCode()));
+            syncKeys();
 
             float deltaX = 0;
             float deltaY = 0;
@@ -70,6 +123,14 @@ public class GuiMove extends Module {
 
     @EventHandler
     public void onPacketSend(PacketEvent.Send e) {
+        // FunTime: hold own-inventory clicks made while moving, send them after the screen is closed
+        if (clickBypass.is(Bypass.FunTime) && e.getPacket() instanceof ClickSlotC2SPacket funClick
+                && MovementUtility.isMoving() && mc.currentScreen instanceof InventoryScreen) {
+            funQueue.add(funClick);
+            e.cancel();
+            return;
+        }
+
         if (!MovementUtility.isMoving() || !mc.options.jumpKey.isPressed() || pause.get())
             return;
 
@@ -129,6 +190,6 @@ public class GuiMove extends Module {
     }
 
     private enum Bypass {
-        DisableClicks, None, StrictNCP, GrimSwap, MatrixNcp, Delay, StrictNCP2
+        DisableClicks, None, StrictNCP, GrimSwap, MatrixNcp, Delay, StrictNCP2, FunTime
     }
 }
