@@ -380,7 +380,7 @@ public class Aura extends Module {
         if (e.getPacket() instanceof EntityStatusS2CPacket status)
             if (status.getStatus() == 30 && status.getEntity(mc.world) != null && target != null && status.getEntity(mc.world) == target)
                 Managers.NOTIFICATION.publicity("Aura", isRu() ? ("Успешно сломали щит игроку " + target.getName().getString()) : ("Succesfully destroyed " + target.getName().getString() + "'s shield"), 2, Notification.Type.SUCCESS);
-
+if (e.getPacket() instanceof PlayerPositionLookS2CPacket) pauseTimer.reset();
         if (e.getPacket() instanceof PlayerPositionLookS2CPacket && tpDisable.getValue())
             disable(isRu() ? "Отключаю из-за телепортации!" : "Disabling due to tp!");
 
