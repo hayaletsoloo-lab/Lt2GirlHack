@@ -261,12 +261,19 @@ public class ModuleManager implements IManager {
     public static ESP esp = new ESP();
     public static RPC rpc = new RPC();
 
+    private static final Set<String> KEEP_COMBAT = Set.of("aura", "antibot", "autobuff", "autototem");
+
     public ModuleManager() {
         for (Field field : getClass().getDeclaredFields()) {
             if (Module.class.isAssignableFrom(field.getType())) {
                 field.setAccessible(true);
                 try {
-                    modules.add((Module) field.get(this));
+                    Module m = (Module) field.get(this);
+                    // Combat kategorisinde sadece bu moduller kalir, digerleri listeye eklenmez
+                    if (m.getCategory() == Module.Category.COMBAT
+                            && !KEEP_COMBAT.contains(m.getName().toLowerCase()))
+                        continue;
+                    modules.add(m);
                 } catch (IllegalAccessException e) {
                     e.printStackTrace();
                 }
