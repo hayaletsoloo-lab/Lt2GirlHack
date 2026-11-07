@@ -469,7 +469,7 @@ public class Aura extends Module {
             swingHand();
             sendPacket(new UpdateSelectedSlotC2SPacket(mc.player.getInventory().selectedSlot));
         }
-        hitTicks = 10;
+        hitTicks = 14;
         return true;
     }
 
