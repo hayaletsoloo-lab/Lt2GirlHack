@@ -723,8 +723,7 @@ public class ElytraPlus extends Module {
         if (!inOffhand && prevSlot != slot)
             sendPacket(new UpdateSelectedSlotC2SPacket(slot));
 
-        sendSequencedPacket(id -> new PlayerInteractItemC2SPacket(inOffhand ? Hand.OFF_HAND : Hand.MAIN_HAND, id, mc.player.getYaw(), mc.player.getPitch()));
-
+        sendSequencedPacket(id -> new PlayerInteractItemC2SPacket(inOffhand ? Hand.OFF_HAND : Hand.MAIN_HAND, id, (thunder.hack.core.manager.client.ModuleManager.aura.isEnabled() && thunder.hack.features.modules.combat.Aura.target != null && thunder.hack.core.manager.client.ModuleManager.aura.elytraTarget.getValue()) ? thunder.hack.core.manager.client.ModuleManager.aura.rotationYaw : mc.player.getYaw(), (thunder.hack.core.manager.client.ModuleManager.aura.isEnabled() && thunder.hack.features.modules.combat.Aura.target != null && thunder.hack.core.manager.client.ModuleManager.aura.elytraTarget.getValue()) ? thunder.hack.core.manager.client.ModuleManager.aura.rotationPitch : mc.player.getPitch()));
         if (!inOffhand && prevSlot != mc.player.getInventory().selectedSlot)
             sendPacket(new UpdateSelectedSlotC2SPacket(prevSlot));
 
