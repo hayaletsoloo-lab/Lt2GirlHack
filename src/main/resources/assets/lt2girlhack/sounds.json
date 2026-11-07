@@ -1,0 +1,92 @@
+{
+  "keypress": {
+    "sounds": [
+      "lt2girlhack:keypress"
+    ]
+  },
+  "keyrelease": {
+    "sounds": [
+      "lt2girlhack:keyrelease"
+    ]
+  },
+  "uwu": {
+    "sounds": [
+      "lt2girlhack:uwu"
+    ]
+  },
+  "disable": {
+    "sounds": [
+      "lt2girlhack:disable"
+    ]
+  },
+  "enable": {
+    "sounds": [
+      "lt2girlhack:enable"
+    ]
+  },
+  "moan1": {
+    "sounds": [
+      "lt2girlhack:moan1"
+    ]
+  },
+  "moan2": {
+    "sounds": [
+      "lt2girlhack:moan2"
+    ]
+  },
+  "moan3": {
+    "sounds": [
+      "lt2girlhack:moan3"
+    ]
+  },
+  "moan4": {
+    "sounds": [
+      "lt2girlhack:moan4"
+    ]
+  },
+  "skeet": {
+    "sounds": [
+      "lt2girlhack:skeet"
+    ]
+  },
+  "orthodox": {
+    "sounds": [
+      "lt2girlhack:orthodox"
+    ]
+  },
+  "boolean": {
+    "sounds": [
+      "lt2girlhack:boolean"
+    ]
+  },
+  "scroll": {
+    "sounds": [
+      "lt2girlhack:scroll"
+    ]
+  },
+  "swipein": {
+    "sounds": [
+      "lt2girlhack:swipein"
+    ]
+  },
+  "swipeout": {
+    "sounds": [
+      "lt2girlhack:swipeout"
+    ]
+  },
+  "pmsound": {
+    "sounds": [
+      "lt2girlhack:pmsound"
+    ]
+  },
+  "rifk": {
+    "sounds": [
+      "lt2girlhack:rifk"
+    ]
+  },
+  "cutie": {
+    "sounds": [
+      "lt2girlhack:cutie"
+    ]
+  }
+}

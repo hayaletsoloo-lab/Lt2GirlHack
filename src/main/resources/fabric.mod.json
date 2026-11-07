@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "lt2girlhack",
+  "version": "1.7",
+  "icon": "icon.png",
+  "name": "Lt2GirlHack",
+  "description": "Player Assistance Mod",
+  "authors": [
+    {
+      "name": "pan4ur",
+      "contact": {
+        "discord": "pan4ur"
+      }
+    },
+    {
+      "name": "06ED",
+      "contact": {
+        "discord": "dinner_enjoyer"
+      }
+    }
+  ],
+  "license": "GNU General Public License v3.0",
+  "accessWidener": "lt2girlhack.accesswidener",
+  "environment": "client",
+  "entrypoints": {
+    "main": [
+      "thunder.hack.Lt2GirlHack"
+    ]
+  },
+  "contact": {
+    "sources": "https://github.com/Pan4ur/ThunderHack-Recode",
+    "homepage": "https://thunderhack-site.vercel.app",
+    "issues": "https://github.com/Pan4ur/ThunderHack-Recode/issues"
+  },
+  "mixins": [
+    "lt2girlhack.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "minecraft": "~1.21",
+    "java": ">=21"
+  },
+  "suggests": {
+    "sodium": "*",
+    "exordium": "*",
+    "starlight": "*",
+    "ias": "*",
+    "viafabricplus": "*"
+  }
+}
