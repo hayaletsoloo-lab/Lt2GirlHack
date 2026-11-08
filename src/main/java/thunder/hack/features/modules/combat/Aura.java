@@ -28,7 +28,7 @@ import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.*;
 import org.jetbrains.annotations.NotNull;
-import thunder.hack.Lt2GirlHack;
+import thunder.hack.ThunderHack;
 import thunder.hack.core.Core;
 import thunder.hack.core.Managers;
 import thunder.hack.core.manager.client.ModuleManager;
@@ -47,6 +47,7 @@ import thunder.hack.utility.interfaces.IOtherClientPlayerEntity;
 import thunder.hack.utility.math.MathUtility;
 import thunder.hack.utility.player.InteractionUtility;
 import thunder.hack.utility.player.InventoryUtility;
+import thunder.hack.utility.player.PolarTuning;
 import thunder.hack.utility.player.PlayerUtility;
 import thunder.hack.utility.player.SearchInvResult;
 import thunder.hack.utility.render.Render2DEngine;
@@ -79,6 +80,8 @@ public class Aura extends Module {
     public final Setting<Boolean> onlySpace = new Setting<>("OnlyCrit", false).addToGroup(smartCrit);
     public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
     public final Setting<Boolean> shieldBreaker = new Setting<>("ShieldBreaker", true);
+    // Polar profile. UNVERIFIED against Polar: hotbar-only axe swap (no inventory click, no close-screen packet) and jittered cooldown.
+    public final Setting<Boolean> polarShield = new Setting<>("PolarShield", false);
     public final Setting<Boolean> pauseWhileEating = new Setting<>("PauseWhileEating", false);
     public final Setting<Boolean> tpsSync = new Setting<>("TPSSync", false);
     public final Setting<Boolean> clientLook = new Setting<>("ClientLook", false);
@@ -87,12 +90,12 @@ public class Aura extends Module {
     public final Setting<Integer> minCPS = new Setting<>("MinCPS", 7, 1, 20).addToGroup(oldDelay);
     public final Setting<Integer> maxCPS = new Setting<>("MaxCPS", 12, 1, 20).addToGroup(oldDelay);
 
-    public final Setting<ESP> esp = new Setting<>("ESP", ESP.Lt2GirlHack);
-    public final Setting<SettingGroup> espGroup = new Setting<>("ESPSettings", new SettingGroup(false, 0), v -> esp.is(ESP.Lt2GirlHackV2));
-    public final Setting<Integer> espLength = new Setting<>("ESPLength", 14, 1, 40, v -> esp.is(ESP.Lt2GirlHackV2)).addToGroup(espGroup);
-    public final Setting<Integer> espFactor = new Setting<>("ESPFactor", 8, 1, 20, v -> esp.is(ESP.Lt2GirlHackV2)).addToGroup(espGroup);
-    public final Setting<Float> espShaking = new Setting<>("ESPShaking", 1.8f, 1.5f, 10f, v -> esp.is(ESP.Lt2GirlHackV2)).addToGroup(espGroup);
-    public final Setting<Float> espAmplitude = new Setting<>("ESPAmplitude", 3f, 0.1f, 8f, v -> esp.is(ESP.Lt2GirlHackV2)).addToGroup(espGroup);
+    public final Setting<ESP> esp = new Setting<>("ESP", ESP.ThunderHack);
+    public final Setting<SettingGroup> espGroup = new Setting<>("ESPSettings", new SettingGroup(false, 0), v -> esp.is(ESP.ThunderHackV2));
+    public final Setting<Integer> espLength = new Setting<>("ESPLength", 14, 1, 40, v -> esp.is(ESP.ThunderHackV2)).addToGroup(espGroup);
+    public final Setting<Integer> espFactor = new Setting<>("ESPFactor", 8, 1, 20, v -> esp.is(ESP.ThunderHackV2)).addToGroup(espGroup);
+    public final Setting<Float> espShaking = new Setting<>("ESPShaking", 1.8f, 1.5f, 10f, v -> esp.is(ESP.ThunderHackV2)).addToGroup(espGroup);
+    public final Setting<Float> espAmplitude = new Setting<>("ESPAmplitude", 3f, 0.1f, 8f, v -> esp.is(ESP.ThunderHackV2)).addToGroup(espGroup);
 
     public final Setting<Sort> sort = new Setting<>("Sort", Sort.LowestDistance);
     public final Setting<Boolean> lockTarget = new Setting<>("LockTarget", true);
@@ -325,7 +328,7 @@ public class Aura extends Module {
 
         if (mc.player.isUsingItem() && pauseWhileEating.getValue())
             return;
-        if(pauseBaritone.getValue() && Lt2GirlHack.baritone){
+        if(pauseBaritone.getValue() && ThunderHack.baritone){
             boolean isTargeted = (target != null);
             if (isTargeted && !wasTargeted) {
                 BaritoneAPI.getProvider().getPrimaryBaritone().getCommandManager().execute("pause");
@@ -380,7 +383,7 @@ public class Aura extends Module {
         if (e.getPacket() instanceof EntityStatusS2CPacket status)
             if (status.getStatus() == 30 && status.getEntity(mc.world) != null && target != null && status.getEntity(mc.world) == target)
                 Managers.NOTIFICATION.publicity("Aura", isRu() ? ("Успешно сломали щит игроку " + target.getName().getString()) : ("Succesfully destroyed " + target.getName().getString() + "'s shield"), 2, Notification.Type.SUCCESS);
-if (e.getPacket() instanceof PlayerPositionLookS2CPacket) pauseTimer.reset();
+
         if (e.getPacket() instanceof PlayerPositionLookS2CPacket && tpDisable.getValue())
             disable(isRu() ? "Отключаю из-за телепортации!" : "Disabling due to tp!");
 
@@ -456,6 +459,8 @@ if (e.getPacket() instanceof PlayerPositionLookS2CPacket) pauseTimer.reset();
         if (((PlayerEntity) target).getOffHandStack().getItem() != Items.SHIELD && ((PlayerEntity) target).getMainHandStack().getItem() != Items.SHIELD)
             return false;
 
+        if (polarShield.getValue() && axeSlot >= 9) return false;
+
         if (axeSlot >= 9) {
             mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, axeSlot, mc.player.getInventory().selectedSlot, SlotActionType.SWAP, mc.player);
             sendPacket(new CloseHandledScreenC2SPacket(mc.player.currentScreenHandler.syncId));
@@ -469,7 +474,7 @@ if (e.getPacket() instanceof PlayerPositionLookS2CPacket) pauseTimer.reset();
             swingHand();
             sendPacket(new UpdateSelectedSlotC2SPacket(mc.player.getInventory().selectedSlot));
         }
-        hitTicks = 14;
+        hitTicks = polarShield.getValue() ? PolarTuning.pickCooldown(10, 3, Math::random) : 10;
         return true;
     }
 
@@ -485,7 +490,7 @@ if (e.getPacket() instanceof PlayerPositionLookS2CPacket) pauseTimer.reset();
     }
 
     public float getAttackCooldownProgressPerTick() {
-        return (float) (1.0 / mc.player.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED) * (20.0 * Lt2GirlHack.TICK_TIMER * (tpsSync.getValue() ? Managers.SERVER.getTPSFactor() : 1f)));
+        return (float) (1.0 / mc.player.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED) * (20.0 * ThunderHack.TICK_TIMER * (tpsSync.getValue() ? Managers.SERVER.getTPSFactor() : 1f)));
     }
 
     public float getAttackCooldown() {
@@ -583,8 +588,8 @@ if (e.getPacket() instanceof PlayerPositionLookS2CPacket) pauseTimer.reset();
         switch (esp.getValue()) {
             case CelkaPasta -> Render3DEngine.drawOldTargetEsp(stack, target);
             case NurikZapen -> CaptureMark.render(target);
-            case Lt2GirlHackV2 -> Render3DEngine.renderGhosts(espLength.getValue(), espFactor.getValue(), espShaking.getValue(), espAmplitude.getValue(), target);
-            case Lt2GirlHack -> Render3DEngine.drawTargetEsp(stack, target);
+            case ThunderHackV2 -> Render3DEngine.renderGhosts(espLength.getValue(), espFactor.getValue(), espShaking.getValue(), espAmplitude.getValue(), target);
+            case ThunderHack -> Render3DEngine.drawTargetEsp(stack, target);
         }
 
         if (clientLook.getValue() && rotationMode.getValue() != Mode.None) {
@@ -907,7 +912,7 @@ if (e.getPacket() instanceof PlayerPositionLookS2CPacket) pauseTimer.reset();
     }
 
     public enum ESP {
-        Off, Lt2GirlHack, NurikZapen, CelkaPasta, Lt2GirlHackV2
+        Off, ThunderHack, NurikZapen, CelkaPasta, ThunderHackV2
     }
 
     public enum AccelerateOnHit {
