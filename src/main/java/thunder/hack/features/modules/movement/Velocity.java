@@ -17,6 +17,7 @@ import thunder.hack.injection.accesors.IExplosionS2CPacket;
 import thunder.hack.injection.accesors.ISPacketEntityVelocity;
 import thunder.hack.setting.Setting;
 import thunder.hack.utility.player.MovementUtility;
+import thunder.hack.utility.player.PolarTuning;
 
 //TY <3
 //https://github.com/SkidderMC/FDPClient/blob/main/src/main/java/net/ccbluex/liquidbounce/features/module/modules/combat/velocitys/vanilla/JumpVelocity.kt
@@ -40,7 +41,16 @@ public class Velocity extends Module {
     public Setting<Float> failRate = new Setting<>("FailRate", 0.3f, 0.0f, 1.0f, v -> mode.getValue() == modeEn.Jump && fail.getValue());
     public Setting<Float> jumpRate = new Setting<>("FailJumpRate", 0.25f, 0.0f, 1.0f, v -> mode.getValue() == modeEn.Jump && fail.getValue());
 
+    // Polar profile. UNVERIFIED against Polar: defaults are hypotheses, tune from flag logs.
+    public Setting<Float> polarHMin = new Setting<>("PolarHMin", 60f, 0f, 100f, v -> mode.getValue() == modeEn.Polar);
+    public Setting<Float> polarHMax = new Setting<>("PolarHMax", 90f, 0f, 100f, v -> mode.getValue() == modeEn.Polar);
+    public Setting<Float> polarVMin = new Setting<>("PolarVMin", 100f, 0f, 100f, v -> mode.getValue() == modeEn.Polar);
+    public Setting<Float> polarVMax = new Setting<>("PolarVMax", 100f, 0f, 100f, v -> mode.getValue() == modeEn.Polar);
+    public Setting<Float> polarFullChance = new Setting<>("PolarTakeFullChance", 0.15f, 0f, 1f, v -> mode.getValue() == modeEn.Polar);
+    public Setting<Boolean> polarLog = new Setting<>("PolarLogOnFlag", true, v -> mode.getValue() == modeEn.Polar);
+
     private boolean doJump, failJump, skip, flag;
+    private float lastPolarH = 1f, lastPolarV = 1f;
     private int grimTicks, ccCooldown;
 
 
@@ -96,6 +106,15 @@ public class Velocity extends Module {
                         ((ISPacketEntityVelocity) pac).setMotionX((int) ((float) pac.getVelocityX() * horizontal.getValue() / 100f));
                         ((ISPacketEntityVelocity) pac).setMotionZ((int) ((float) pac.getVelocityZ() * horizontal.getValue() / 100f));
                     }
+                    case Polar -> {
+                        float h = PolarTuning.pickKeepFraction(polarHMin.getValue(), polarHMax.getValue(), polarFullChance.getValue(), Math::random);
+                        float vv = PolarTuning.pickKeepFraction(polarVMin.getValue(), polarVMax.getValue(), polarFullChance.getValue(), Math::random);
+                        lastPolarH = h;
+                        lastPolarV = vv;
+                        ((ISPacketEntityVelocity) pac).setMotionX((int) (pac.getVelocityX() * h));
+                        ((ISPacketEntityVelocity) pac).setMotionY((int) (pac.getVelocityY() * vv));
+                        ((ISPacketEntityVelocity) pac).setMotionZ((int) (pac.getVelocityZ() * h));
+                    }
                     case OldGrim -> {
                         e.cancel();
                         grimTicks = 6;
@@ -121,6 +140,11 @@ public class Velocity extends Module {
                     ((IExplosionS2CPacket) explosion).setMotionZ(((IExplosionS2CPacket) explosion).getMotionZ() * horizontal.getValue() / 100f);
                     ((IExplosionS2CPacket) explosion).setMotionY(((IExplosionS2CPacket) explosion).getMotionY() * vertical.getValue() / 100f);
                 }
+                case Polar -> {
+                    ((IExplosionS2CPacket) explosion).setMotionX(((IExplosionS2CPacket) explosion).getMotionX() * lastPolarH);
+                    ((IExplosionS2CPacket) explosion).setMotionY(((IExplosionS2CPacket) explosion).getMotionY() * lastPolarV);
+                    ((IExplosionS2CPacket) explosion).setMotionZ(((IExplosionS2CPacket) explosion).getMotionZ() * lastPolarH);
+                }
                 case GrimNew -> {
                     ((IExplosionS2CPacket) explosion).setMotionX(0);
                     ((IExplosionS2CPacket) explosion).setMotionY(0);
@@ -142,6 +166,8 @@ public class Velocity extends Module {
         if (e.getPacket() instanceof PlayerPositionLookS2CPacket) {
             if (cc.getValue() || mode.getValue() == modeEn.GrimNew)
                 ccCooldown = 5;
+            if (mode.getValue() == modeEn.Polar && polarLog.getValue())
+                sendMessage("Polar flag. Last keep H=" + Math.round(lastPolarH * 100) + "% V=" + Math.round(lastPolarV * 100) + "% (range H " + polarHMin.getValue() + "-" + polarHMax.getValue() + ")");
         }
     }
 
@@ -215,7 +241,7 @@ public class Velocity extends Module {
     }
 
     public enum modeEn {
-        Matrix, Cancel, Sunrise, Custom, Redirect, OldGrim, Jump, GrimNew
+        Matrix, Cancel, Sunrise, Custom, Redirect, OldGrim, Jump, GrimNew, Polar
     }
 
     public enum jumpModeEn {
