@@ -17,7 +17,6 @@ import thunder.hack.injection.accesors.IExplosionS2CPacket;
 import thunder.hack.injection.accesors.ISPacketEntityVelocity;
 import thunder.hack.setting.Setting;
 import thunder.hack.utility.player.MovementUtility;
-import thunder.hack.utility.player.PolarTuning;
 
 //TY <3
 //https://github.com/SkidderMC/FDPClient/blob/main/src/main/java/net/ccbluex/liquidbounce/features/module/modules/combat/velocitys/vanilla/JumpVelocity.kt
