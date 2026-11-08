@@ -912,7 +912,7 @@ public class Aura extends Module {
     }
 
     public enum ESP {
-        Off, ThunderHack, NurikZapen, CelkaPasta, ThunderHackV2
+        Off, Lt2GirlHack, NurikZapen, CelkaPasta, Lt2GirlHackV2
     }
 
     public enum AccelerateOnHit {
