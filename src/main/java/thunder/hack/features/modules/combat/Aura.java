@@ -839,5 +839,42 @@ public void onEnable() {
     public void pause() {
         pauseTimer.reset();
     }
+        private boolean shouldRandomizeDelay() {
+        return randomHitDelay.getValue() && (mc.player.isOnGround() || mc.player.fallDistance < 0.12f || mc.player.isSwimming() || mc.player.isFallFlying());
+    }
+
+    private boolean shouldRandomizeFallDistance() {
+        return randomHitDelay.getValue() && !shouldRandomizeDelay();
+    }
+
+    public static class Position {
+        private double x, y, z;
+        private int ticks;
+
+        public Position(double x, double y, double z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        public boolean shouldRemove() {
+            return ticks++ > ModuleManager.aura.backTicks.getValue();
+        }
+
+        public double getX() { return x; }
+        public double getY() { return y; }
+        public double getZ() { return z; }
+    }
+
+    public enum RayTrace { OFF, OnlyTarget, AllEntities }
+    public enum Sort { LowestDistance, HighestDistance, LowestHealth, HighestHealth, LowestDurability, HighestDurability, FOV }
+    public enum Switch { Normal, None, Silent }
+    public enum Resolver { Off, Advantage, Predictive, BackTrack }
+    public enum Mode { Interact, Track, Grim, None }
+    public enum AttackHand { MainHand, OffHand, None }
+    public enum ESP { Off, Lt2GirlHack, NurikZapen, CelkaPasta, Lt2GirlHackV2 }
+    public enum AccelerateOnHit { Off, Yaw, Pitch, Both }
+    public enum WallsBypass { Off, V1, V2 }
+}
 
     
