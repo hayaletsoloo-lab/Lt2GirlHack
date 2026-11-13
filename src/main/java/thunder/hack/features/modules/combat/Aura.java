@@ -67,9 +67,9 @@ import static thunder.hack.utility.math.MathUtility.random;
 public class Aura extends Module {
     public final Setting<Float> attackRange = new Setting<>("Range", 3.1f, 1f, 6.0f);
     public final Setting<Float> wallRange = new Setting<>("ThroughWallsRange", 3.1f, 0f, 6.0f);
-    public final Setting<Boolean> elytra = new Setting<>("ElytraOverride",false);
+    public final Setting<Boolean> elytra = new Setting<>("ElytraOverride", false);
     public final Setting<Float> elytraAttackRange = new Setting<>("ElytraRange", 3.1f, 1f, 6.0f, v -> elytra.getValue());
-    public final Setting<Float> elytraWallRange = new Setting<>("ElytraThroughWallsRange", 3.1f, 0f, 6.0f,v -> elytra.getValue());
+    public final Setting<Float> elytraWallRange = new Setting<>("ElytraThroughWallsRange", 3.1f, 0f, 6.0f, v -> elytra.getValue());
     public final Setting<WallsBypass> wallsBypass = new Setting<>("WallsBypass", WallsBypass.Off, v -> getWallRange() > 0);
     public final Setting<Integer> fov = new Setting<>("FOV", 180, 1, 180);
     public final Setting<Mode> rotationMode = new Setting<>("RotationMode", Mode.Track);
@@ -80,7 +80,10 @@ public class Aura extends Module {
     public final Setting<Boolean> onlySpace = new Setting<>("OnlyCrit", false).addToGroup(smartCrit);
     public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
     public final Setting<Boolean> shieldBreaker = new Setting<>("ShieldBreaker", true);
-    // Polar profile. UNVERIFIED against Polar: hotbar-only axe swap (no inventory click, no close-screen packet) and jittered cooldown.
+    
+    // --- POLAR BYPASS EKLENTİSİ ---
+    public final Setting<Boolean> polarBypass = new Setting<>("PolarBypass", true);
+    
     public final Setting<Boolean> polarShield = new Setting<>("PolarShield", false);
     public final Setting<Boolean> pauseWhileEating = new Setting<>("PauseWhileEating", false);
     public final Setting<Boolean> tpsSync = new Setting<>("TPSSync", false);
@@ -99,6 +102,8 @@ public class Aura extends Module {
 
     public final Setting<Sort> sort = new Setting<>("Sort", Sort.LowestDistance);
     public final Setting<Boolean> lockTarget = new Setting<>("LockTarget", true);
+    
+    // --- ELYTRA TARGET EKLENTİSİ ---
     public final Setting<Boolean> elytraTarget = new Setting<>("ElytraTarget", true);
 
     /*   ADVANCED   */
@@ -172,10 +177,12 @@ public class Aura extends Module {
         super("Aura", Category.COMBAT);
     }
 
-    private float getRange(){
+    private float getRange() {
+        if (polarBypass.getValue()) return 2.95f; // POLAR REACH BYPASS
         return elytra.getValue() && mc.player.isFallFlying() ? elytraAttackRange.getValue() : attackRange.getValue();
     }
-    private float getWallRange(){
+
+    private float getWallRange() {
         return elytra.getValue() && mc.player != null && mc.player.isFallFlying() ? elytraWallRange.getValue() : wallRange.getValue();
     }
 
@@ -194,6 +201,20 @@ public class Aura extends Module {
 
         if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue())
             mc.player.jump();
+
+        // --- ELYTRA INTERCEPT BYPASS ---
+        if (elytraTarget.getValue() && target instanceof PlayerEntity playerTarget && mc.player.isFallFlying() && playerTarget.isFallFlying()) {
+            Vec3d targetPos = playerTarget.getPos();
+            Vec3d targetVel = playerTarget.getVelocity();
+            Vec3d futureTargetPos = targetPos.add(targetVel.multiply(10)); // 10 tick sonrasını tahmin et
+
+            Vec3d dir = futureTargetPos.subtract(mc.player.getPos()).normalize();
+            double currentSpeed = Math.sqrt(targetVel.x * targetVel.x + targetVel.z * targetVel.z);
+            double ourSpeed = currentSpeed * 1.15; // Önüne geçmek için %15 daha hızlı
+
+            // Polar için yumuşatılmış hız uygulaması
+            mc.player.setVelocity(dir.x * ourSpeed, targetVel.y - 0.05, dir.z * ourSpeed);
+        }
 
         boolean readyForAttack;
 
@@ -248,7 +269,7 @@ public class Aura extends Module {
             InventoryUtility.switchTo(prevSlot);
     }
 
-    private boolean @NotNull [] preAttack() {
+    private boolean[] preAttack() {
         boolean blocking = mc.player.isUsingItem() && mc.player.getActiveItem().getItem().getUseAction(mc.player.getActiveItem()) == BLOCK;
         if (blocking && unpressShield.getValue())
             sendPacket(new PlayerActionC2SPacket(PlayerActionC2SPacket.Action.RELEASE_USE_ITEM, BlockPos.ORIGIN, Direction.DOWN));
@@ -318,6 +339,9 @@ public class Aura extends Module {
     }
 
     private int getHitTicks() {
+        // --- POLAR CPS BYPASS ---
+        if (polarBypass.getValue()) return 12; // 600ms delay
+        
         return oldDelay.getValue().isEnabled() ? 1 + (int) (20f / random(minCPS.getValue(), maxCPS.getValue())) : (shouldRandomizeDelay() ? (int) MathUtility.random(11, 13) : attackTickLimit.getValue());
     }
 
@@ -328,7 +352,7 @@ public class Aura extends Module {
 
         if (mc.player.isUsingItem() && pauseWhileEating.getValue())
             return;
-        if(pauseBaritone.getValue() && ThunderHack.baritone){
+        if (pauseBaritone.getValue() && ThunderHack.baritone) {
             boolean isTargeted = (target != null);
             if (isTargeted && !wasTargeted) {
                 BaritoneAPI.getProvider().getPrimaryBaritone().getCommandManager().execute("pause");
@@ -351,575 +375,4 @@ public class Aura extends Module {
             return;
 
         if (mc.player.isUsingItem() && pauseWhileEating.getValue())
-            return;
-
-        if (!haveWeapon())
-            return;
-
-        if (target != null && rotationMode.getValue() != Mode.None && rotationMode.getValue() != Mode.Grim) {
-            mc.player.setYaw(rotationYaw);
-            mc.player.setPitch(rotationPitch);
-        } else {
-            rotationYaw = mc.player.getYaw();
-            rotationPitch = mc.player.getPitch();
-        }
-
-        if (oldDelay.getValue().isEnabled())
-            if (minCPS.getValue() > maxCPS.getValue())
-                minCPS.setValue(maxCPS.getValue());
-
-        if (target != null && pullDown.getValue() && (mc.player.hasStatusEffect(StatusEffects.JUMP_BOOST) || !onlyJumpBoost.getValue()))
-            mc.player.addVelocity(0f, -pullValue.getValue() / 1000f, 0f);
-    }
-
-    @EventHandler
-    public void onPacketSend(PacketEvent.@NotNull Send e) {
-        if (e.getPacket() instanceof PlayerInteractEntityC2SPacket pie && Criticals.getInteractType(pie) != Criticals.InteractType.ATTACK && target != null)
-            e.cancel();
-    }
-
-    @EventHandler
-    public void onPacketReceive(PacketEvent.@NotNull Receive e) {
-        if (e.getPacket() instanceof EntityStatusS2CPacket status)
-            if (status.getStatus() == 30 && status.getEntity(mc.world) != null && target != null && status.getEntity(mc.world) == target)
-                Managers.NOTIFICATION.publicity("Aura", isRu() ? ("Успешно сломали щит игроку " + target.getName().getString()) : ("Succesfully destroyed " + target.getName().getString() + "'s shield"), 2, Notification.Type.SUCCESS);
-
-        if (e.getPacket() instanceof PlayerPositionLookS2CPacket && tpDisable.getValue())
-            disable(isRu() ? "Отключаю из-за телепортации!" : "Disabling due to tp!");
-
-        if (e.getPacket() instanceof EntityStatusS2CPacket pac && pac.getStatus() == 3 && pac.getEntity(mc.world) == mc.player && deathDisable.getValue())
-            disable(isRu() ? "Отключаю из-за смерти!" : "Disabling due to death!");
-
-        /*
-        if (resolver.is(Resolver.BackTrack) && e.getPacket() instanceof CommonPingS2CPacket ping && target != null) {
-            Managers.ASYNC.run(() -> mc.executeSync(() -> ping.apply(mc.getNetworkHandler())), backTicks.getValue() * 25L);
-            e.cancel();
-        }*/
-    }
-
-    @Override
-    public void onEnable() {
-        target = null;
-        lookingAtHitbox = false;
-        rotationPoint = Vec3d.ZERO;
-        rotationMotion = Vec3d.ZERO;
-        rotationYaw = mc.player.getYaw();
-        rotationPitch = mc.player.getPitch();
-        delayTimer.reset();
-    }
-
-    private boolean autoCrit() {
-        boolean reasonForSkipCrit =
-                !smartCrit.getValue().isEnabled()
-                        || mc.player.getAbilities().flying
-                        || (mc.player.isFallFlying() || ModuleManager.elytraPlus.isEnabled())
-                        || mc.player.hasStatusEffect(StatusEffects.BLINDNESS)
-                        || mc.player.hasStatusEffect(StatusEffects.SLOW_FALLING)
-                        || Managers.PLAYER.isInWeb();
-
-        if (hitTicks > 0)
-            return false;
-
-        if (pauseInInventory.getValue() && Managers.PLAYER.inInventory)
-            return false;
-
-        if (getAttackCooldown() < attackCooldown.getValue() && !oldDelay.getValue().isEnabled())
-            return false;
-
-        if (ModuleManager.criticals.isEnabled() && ModuleManager.criticals.mode.is(Criticals.Mode.Grim))
-            return true;
-
-        boolean mergeWithTargetStrafe = !ModuleManager.targetStrafe.isEnabled() || !ModuleManager.targetStrafe.jump.getValue();
-        boolean mergeWithSpeed = !ModuleManager.speed.isEnabled() || mc.player.isOnGround();
-
-        if (!mc.options.jumpKey.isPressed() && mergeWithTargetStrafe && mergeWithSpeed && !onlySpace.getValue() && !autoJump.getValue())
-            return true;
-
-        if (mc.player.isInLava() || mc.player.isSubmergedInWater())
-            return true;
-
-        if (!mc.options.jumpKey.isPressed() && isAboveWater())
-            return true;
-
-        // я хз почему оно не критует когда фд больше 1.14
-        if (mc.player.fallDistance > 1 && mc.player.fallDistance < 1.14)
-            return false;
-
-        if (!reasonForSkipCrit)
-            return !mc.player.isOnGround() && mc.player.fallDistance > (shouldRandomizeFallDistance() ? MathUtility.random(0.15f, 0.7f) : critFallDistance.getValue());
-        return true;
-    }
-
-    private boolean shieldBreaker(boolean instant) { //todo - Actual value of parameter 'instant' is always 'false'
-        int axeSlot = InventoryUtility.getAxe().slot();
-        if (axeSlot == -1) return false;
-        if (!shieldBreaker.getValue()) return false;
-        if (!(target instanceof PlayerEntity)) return false;
-        if (!((PlayerEntity) target).isUsingItem() && !instant) return false;
-        if (((PlayerEntity) target).getOffHandStack().getItem() != Items.SHIELD && ((PlayerEntity) target).getMainHandStack().getItem() != Items.SHIELD)
-            return false;
-
-        if (polarShield.getValue() && axeSlot >= 9) return false;
-
-        if (axeSlot >= 9) {
-            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, axeSlot, mc.player.getInventory().selectedSlot, SlotActionType.SWAP, mc.player);
-            sendPacket(new CloseHandledScreenC2SPacket(mc.player.currentScreenHandler.syncId));
-            mc.interactionManager.attackEntity(mc.player, target);
-            swingHand();
-            mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, axeSlot, mc.player.getInventory().selectedSlot, SlotActionType.SWAP, mc.player);
-            sendPacket(new CloseHandledScreenC2SPacket(mc.player.currentScreenHandler.syncId));
-        } else {
-            sendPacket(new UpdateSelectedSlotC2SPacket(axeSlot));
-            mc.interactionManager.attackEntity(mc.player, target);
-            swingHand();
-            sendPacket(new UpdateSelectedSlotC2SPacket(mc.player.getInventory().selectedSlot));
-        }
-        hitTicks = polarShield.getValue() ? PolarTuning.pickCooldown(10, 3, Math::random) : 10;
-        return true;
-    }
-
-    private void swingHand() {
-        switch (attackHand.getValue()) {
-            case OffHand -> mc.player.swingHand(Hand.OFF_HAND);
-            case MainHand -> mc.player.swingHand(Hand.MAIN_HAND);
-        }
-    }
-
-    public boolean isAboveWater() {
-        return mc.player.isSubmergedInWater() || mc.world.getBlockState(BlockPos.ofFloored(mc.player.getPos().add(0, -0.4, 0))).getBlock() == Blocks.WATER;
-    }
-
-    public float getAttackCooldownProgressPerTick() {
-        return (float) (1.0 / mc.player.getAttributeValue(EntityAttributes.GENERIC_ATTACK_SPEED) * (20.0 * ThunderHack.TICK_TIMER * (tpsSync.getValue() ? Managers.SERVER.getTPSFactor() : 1f)));
-    }
-
-    public float getAttackCooldown() {
-        return MathHelper.clamp(((float) ((ILivingEntity) mc.player).getLastAttackedTicks() + attackBaseTime.getValue()) / getAttackCooldownProgressPerTick(), 0.0F, 1.0F);
-    }
-
-    private void updateTarget() {
-        Entity candidat = findTarget();
-
-        if (target == null) {
-            target = candidat;
-            return;
-        }
-
-        if (sort.getValue() == Sort.FOV || !lockTarget.getValue())
-            target = candidat;
-
-        if (candidat instanceof ProjectileEntity)
-            target = candidat;
-
-        if (skipEntity(target))
-            target = null;
-    }
-
-    private void calcRotations(boolean ready) {
-        if (ready) {
-            trackticks = (mc.world.getBlockCollisions(mc.player, mc.player.getBoundingBox().expand(-0.25, 0.0, -0.25).offset(0.0, 1, 0.0)).iterator().hasNext() ? 1 : interactTicks.getValue());
-        } else if (trackticks > 0) {
-            trackticks--;
-        }
-
-        if (target == null)
-            return;
-
-
-        Vec3d targetVec;
-
-        if (mc.player.isFallFlying() || ModuleManager.elytraPlus.isEnabled()) targetVec = target.getEyePos();
-        else targetVec = getLegitLook(target);
-
-        if (targetVec == null)
-            return;
-
-        pitchAcceleration = Managers.PLAYER.checkRtx(rotationYaw, rotationPitch, getRange() + aimRange.getValue(), getRange() + aimRange.getValue(), rayTrace.getValue())
-                ? aimedPitchStep.getValue() : pitchAcceleration < maxPitchStep.getValue() ? pitchAcceleration * pitchAccelerate.getValue() : maxPitchStep.getValue();
-
-        float delta_yaw = wrapDegrees((float) wrapDegrees(Math.toDegrees(Math.atan2(targetVec.z - mc.player.getZ(), (targetVec.x - mc.player.getX()))) - 90) - rotationYaw) + (wallsBypass.is(WallsBypass.V2) && !ready && !mc.player.canSee(target) ? 20 : 0);
-        float delta_pitch = ((float) (-Math.toDegrees(Math.atan2(targetVec.y - (mc.player.getPos().y + mc.player.getEyeHeight(mc.player.getPose())), Math.sqrt(Math.pow((targetVec.x - mc.player.getX()), 2) + Math.pow(targetVec.z - mc.player.getZ(), 2))))) - rotationPitch);
-
-        float yawStep = rotationMode.getValue() != Mode.Track ? 360f : random(minYawStep.getValue(), maxYawStep.getValue());
-        float pitchStep = rotationMode.getValue() != Mode.Track ? 180f : Managers.PLAYER.ticksElytraFlying > 5 ? 180 : (pitchAcceleration + random(-1f, 1f));
-
-        if (ready)
-            switch (accelerateOnHit.getValue()) {
-                case Yaw -> yawStep = 180f;
-                case Pitch -> pitchStep = 90f;
-                case Both -> {
-                    yawStep = 180f;
-                    pitchStep = 90f;
-                }
-            }
-
-        if (delta_yaw > 180)
-            delta_yaw = delta_yaw - 180;
-
-        float deltaYaw = MathHelper.clamp(MathHelper.abs(delta_yaw), -yawStep, yawStep);
-
-        float deltaPitch = MathHelper.clamp(delta_pitch, -pitchStep, pitchStep);
-
-        float newYaw = rotationYaw + (delta_yaw > 0 ? deltaYaw : -deltaYaw);
-        float newPitch = MathHelper.clamp(rotationPitch + deltaPitch, -90.0F, 90.0F);
-
-        double gcdFix = (Math.pow(mc.options.getMouseSensitivity().getValue() * 0.6 + 0.2, 3.0)) * 1.2;
-
-        if (trackticks > 0 || rotationMode.getValue() == Mode.Track) {
-            rotationYaw = (float) (newYaw - (newYaw - rotationYaw) % gcdFix);
-            rotationPitch = (float) (newPitch - (newPitch - rotationPitch) % gcdFix);
-        } else {
-            rotationYaw = mc.player.getYaw();
-            rotationPitch = mc.player.getPitch();
-        }
-
-        if (!rotationMode.is(Mode.Grim))
-            ModuleManager.rotations.fixRotation = rotationYaw;
-        lookingAtHitbox = Managers.PLAYER.checkRtx(rotationYaw, rotationPitch, getRange(), getWallRange(), rayTrace.getValue());
-    }
-
-    public void onRender3D(MatrixStack stack) {
-        if (!haveWeapon() || target == null)
-            return;
-
-        if ((resolver.is(Resolver.BackTrack) || resolverVisualisation.getValue()) && resolvedBox != null)
-            Render3DEngine.OUTLINE_QUEUE.add(new Render3DEngine.OutlineAction(resolvedBox, HudEditor.getColor(0), 1));
-
-        switch (esp.getValue()) {
-            case CelkaPasta -> Render3DEngine.drawOldTargetEsp(stack, target);
-            case NurikZapen -> CaptureMark.render(target);
-            case ThunderHackV2 -> Render3DEngine.renderGhosts(espLength.getValue(), espFactor.getValue(), espShaking.getValue(), espAmplitude.getValue(), target);
-            case ThunderHack -> Render3DEngine.drawTargetEsp(stack, target);
-        }
-
-        if (clientLook.getValue() && rotationMode.getValue() != Mode.None) {
-            mc.player.setYaw((float) Render2DEngine.interpolate(mc.player.prevYaw, rotationYaw, Render3DEngine.getTickDelta()));
-            mc.player.setPitch((float) Render2DEngine.interpolate(mc.player.prevPitch, rotationPitch, Render3DEngine.getTickDelta()));
-        }
-    }
-
-    @Override
-    public void onDisable() {
-        target = null;
-    }
-
-    public float getSquaredRotateDistance() {
-        float dst = getRange();
-        dst += aimRange.getValue();
-        if ((mc.player.isFallFlying() || ModuleManager.elytraPlus.isEnabled()) && target != null) dst += 4f;
-        if (ModuleManager.strafe.isEnabled()) dst += 4f;
-        if (rotationMode.getValue() != Mode.Track || rayTrace.getValue() == RayTrace.OFF)
-            dst = getRange();
-
-        return dst * dst;
-    }
-
-    /*
-     * Эта хуеверть основанна на приципе "DVD Logo"
-     * У нас есть точка и "коробка" (хитбокс цели)
-     * Точка летает внутри коробки и отталкивается от стенок с рандомной скоростью и легким джиттером
-     * Также выбирает лучшую дистанцию для удара, то есть считает не от центра до центра, а от наших глаз до достигаемых точек хитбокса цели
-     * Со стороны не сильно заметно что ты играешь с киллкой, в отличие от аур семейства Wexside
-     */
-
-    public Vec3d getLegitLook(Entity target) {
-
-        float minMotionXZ = 0.003f;
-        float maxMotionXZ = 0.03f;
-
-        float minMotionY = 0.001f;
-        float maxMotionY = 0.03f;
-
-        double lenghtX = target.getBoundingBox().getLengthX();
-        double lenghtY = target.getBoundingBox().getLengthY();
-        double lenghtZ = target.getBoundingBox().getLengthZ();
-
-
-        // Задаем начальную скорость точки
-        if (rotationMotion.equals(Vec3d.ZERO))
-            rotationMotion = new Vec3d(random(-0.05f, 0.05f), random(-0.05f, 0.05f), random(-0.05f, 0.05f));
-
-        rotationPoint = rotationPoint.add(rotationMotion);
-
-        // Сталкиваемся с хитбоксом по X
-        if (rotationPoint.x >= (lenghtX - 0.05) / 2f)
-            rotationMotion = new Vec3d(-random(minMotionXZ, maxMotionXZ), rotationMotion.getY(), rotationMotion.getZ());
-
-        // Сталкиваемся с хитбоксом по Y
-        if (rotationPoint.y >= lenghtY)
-            rotationMotion = new Vec3d(rotationMotion.getX(), -random(minMotionY, maxMotionY), rotationMotion.getZ());
-
-        // Сталкиваемся с хитбоксом по Z
-        if (rotationPoint.z >= (lenghtZ - 0.05) / 2f)
-            rotationMotion = new Vec3d(rotationMotion.getX(), rotationMotion.getY(), -random(minMotionXZ, maxMotionXZ));
-
-        // Сталкиваемся с хитбоксом по -X
-        if (rotationPoint.x <= -(lenghtX - 0.05) / 2f)
-            rotationMotion = new Vec3d(random(minMotionXZ, 0.03f), rotationMotion.getY(), rotationMotion.getZ());
-
-        // Сталкиваемся с хитбоксом по -Y
-        if (rotationPoint.y <= 0.05)
-            rotationMotion = new Vec3d(rotationMotion.getX(), random(minMotionY, maxMotionY), rotationMotion.getZ());
-
-        // Сталкиваемся с хитбоксом по -Z
-        if (rotationPoint.z <= -(lenghtZ - 0.05) / 2f)
-            rotationMotion = new Vec3d(rotationMotion.getX(), rotationMotion.getY(), random(minMotionXZ, maxMotionXZ));
-
-        // Добавляем джиттер
-        rotationPoint.add(random(-0.03f, 0.03f), 0f, random(-0.03f, 0.03f));
-
-        if (!mc.player.canSee(target)) {
-            // Если мы используем обход ударов через стену V1 и наша цель за стеной, то целимся в верхушку хитбокса т.к. матриксу поебать
-            if (Objects.requireNonNull(wallsBypass.getValue()) == WallsBypass.V1) {
-                return target.getPos().add(random(-0.15, 0.15), lenghtY, random(-0.15, 0.15));
-            }
-        }
-
-        float[] rotation;
-
-        // Если мы перестали смотреть на цель
-        if (!Managers.PLAYER.checkRtx(rotationYaw, rotationPitch, getRange(), getWallRange(), rayTrace.getValue())) {
-            float[] rotation1 = Managers.PLAYER.calcAngle(target.getPos().add(0, target.getEyeHeight(target.getPose()) / 2f, 0));
-
-            // Проверяем видимость центра игрока
-            if (PlayerUtility.squaredDistanceFromEyes(target.getPos().add(0, target.getEyeHeight(target.getPose()) / 2f, 0)) <= attackRange.getPow2Value()
-                    && Managers.PLAYER.checkRtx(rotation1[0], rotation1[1], getRange(), 0, rayTrace.getValue())) {
-                // наводим на центр
-                rotationPoint = new Vec3d(random(-0.1f, 0.1f), target.getEyeHeight(target.getPose()) / (random(1.8f, 2.5f)), random(-0.1f, 0.1f));
-            } else {
-                // Сканим хитбокс на видимую точку
-                float halfBox = (float) (lenghtX / 2f);
-
-                for (float x1 = -halfBox; x1 <= halfBox; x1 += 0.05f) {
-                    for (float z1 = -halfBox; z1 <= halfBox; z1 += 0.05f) {
-                        for (float y1 = 0.05f; y1 <= target.getBoundingBox().getLengthY(); y1 += 0.15f) {
-
-                            Vec3d v1 = new Vec3d(target.getX() + x1, target.getY() + y1, target.getZ() + z1);
-
-                            // Скипаем, если вне досягаемости
-                            if (PlayerUtility.squaredDistanceFromEyes(v1) > attackRange.getPow2Value()) continue;
-
-                            rotation = Managers.PLAYER.calcAngle(v1);
-                            if (Managers.PLAYER.checkRtx(rotation[0], rotation[1], getRange(), 0, rayTrace.getValue())) {
-                                // Наводимся, если видим эту точку
-                                rotationPoint = new Vec3d(x1, y1, z1);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return target.getPos().add(rotationPoint);
-    }
-
-    public boolean isInRange(Entity target) {
-
-        if (PlayerUtility.squaredDistanceFromEyes(target.getPos().add(0, target.getEyeHeight(target.getPose()), 0)) > getSquaredRotateDistance() + 4) {
-            return false;
-        }
-
-        float[] rotation;
-        float halfBox = (float) (target.getBoundingBox().getLengthX() / 2f);
-
-        // уменьшил частоту выборки
-        for (float x1 = -halfBox; x1 <= halfBox; x1 += 0.15f) {
-            for (float z1 = -halfBox; z1 <= halfBox; z1 += 0.15f) {
-                for (float y1 = 0.05f; y1 <= target.getBoundingBox().getLengthY(); y1 += 0.25f) {
-                    if (PlayerUtility.squaredDistanceFromEyes(new Vec3d(target.getX() + x1, target.getY() + y1, target.getZ() + z1)) > getSquaredRotateDistance())
-                        continue;
-
-                    rotation = Managers.PLAYER.calcAngle(new Vec3d(target.getX() + x1, target.getY() + y1, target.getZ() + z1));
-                    if (Managers.PLAYER.checkRtx(rotation[0], rotation[1], (float) Math.sqrt(getSquaredRotateDistance()), getWallRange(), rayTrace.getValue())) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    public Entity findTarget() {
-        List<LivingEntity> first_stage = new CopyOnWriteArrayList<>();
-        for (Entity ent : mc.world.getEntities()) {
-            if ((ent instanceof ShulkerBulletEntity || ent instanceof FireballEntity)
-                    && ent.isAlive()
-                    && isInRange(ent)
-                    && Projectiles.getValue()) {
-                return ent;
-            }
-            if (skipEntity(ent)) continue;
-            if (!(ent instanceof LivingEntity)) continue;
-            first_stage.add((LivingEntity) ent);
-        }
-
-        return switch (sort.getValue()) {
-            case LowestDistance ->
-                    first_stage.stream().min(Comparator.comparing(e -> (mc.player.squaredDistanceTo(e.getPos())))).orElse(null);
-
-            case HighestDistance ->
-                    first_stage.stream().max(Comparator.comparing(e -> (mc.player.squaredDistanceTo(e.getPos())))).orElse(null);
-
-            case FOV -> first_stage.stream().min(Comparator.comparing(this::getFOVAngle)).orElse(null);
-
-            case LowestHealth ->
-                    first_stage.stream().min(Comparator.comparing(e -> (e.getHealth() + e.getAbsorptionAmount()))).orElse(null);
-
-            case HighestHealth ->
-                    first_stage.stream().max(Comparator.comparing(e -> (e.getHealth() + e.getAbsorptionAmount()))).orElse(null);
-
-            case LowestDurability -> first_stage.stream().min(Comparator.comparing(e -> {
-                        float v = 0;
-                        for (ItemStack armor : e.getArmorItems())
-                            if (armor != null && !armor.getItem().equals(Items.AIR)) {
-                                v += ((armor.getMaxDamage() - armor.getDamage()) / (float) armor.getMaxDamage());
-                            }
-                        return v;
-                    }
-            )).orElse(null);
-
-            case HighestDurability -> first_stage.stream().max(Comparator.comparing(e -> {
-                        float v = 0;
-                        for (ItemStack armor : e.getArmorItems())
-                            if (armor != null && !armor.getItem().equals(Items.AIR)) {
-                                v += ((armor.getMaxDamage() - armor.getDamage()) / (float) armor.getMaxDamage());
-                            }
-                        return v;
-                    }
-            )).orElse(null);
-        };
-    }
-
-    private boolean skipEntity(Entity entity) {
-        if (isBullet(entity)) return false;
-        if (!(entity instanceof LivingEntity ent)) return true;
-        if (ent.isDead() || !entity.isAlive()) return true;
-        if (entity instanceof ArmorStandEntity) return true;
-        if (entity instanceof CatEntity) return true;
-        if (skipNotSelected(entity)) return true;
-        if (!InteractionUtility.isVecInFOV(ent.getPos(), fov.getValue())) return true;
-
-        if (entity instanceof PlayerEntity player) {
-            if (ModuleManager.antiBot.isEnabled() && AntiBot.bots.contains(entity))
-                return true;
-            if (player == mc.player || Managers.FRIEND.isFriend(player))
-                return true;
-            if (player.isCreative() && ignoreCreative.getValue())
-                return true;
-            if (player.getArmor() == 0 && ignoreNaked.getValue())
-                return true;
-            if (player.isInvisible() && ignoreInvisible.getValue())
-                return true;
-            if (player.getTeamColorValue() == mc.player.getTeamColorValue() && ignoreTeam.getValue() && mc.player.getTeamColorValue() != 16777215)
-                return true;
-        }
-
-        return !isInRange(entity) || (entity.hasCustomName() && ignoreNamed.getValue());
-    }
-
-    private boolean isBullet(Entity entity) {
-        return (entity instanceof ShulkerBulletEntity || entity instanceof FireballEntity)
-                && entity.isAlive()
-                && PlayerUtility.squaredDistanceFromEyes(entity.getPos()) < getSquaredRotateDistance()
-                && Projectiles.getValue();
-    }
-
-    private boolean skipNotSelected(Entity entity) {
-        if (entity instanceof SlimeEntity && !Slimes.getValue()) return true;
-        if (entity instanceof HostileEntity he) {
-            if (!hostiles.getValue())
-                return true;
-
-            if (onlyAngry.getValue())
-                return !he.isAngryAt(mc.player);
-        }
-
-        if (entity instanceof PlayerEntity && !Players.getValue()) return true;
-        if (entity instanceof VillagerEntity && !Villagers.getValue()) return true;
-        if (entity instanceof MobEntity && !Mobs.getValue()) return true;
-        return entity instanceof AnimalEntity && !Animals.getValue();
-    }
-
-    private float getFOVAngle(@NotNull LivingEntity e) {
-        double difX = e.getX() - mc.player.getX();
-        double difZ = e.getZ() - mc.player.getZ();
-        float yaw = (float) MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(difZ, difX)) - 90.0);
-        return Math.abs(yaw - MathHelper.wrapDegrees(mc.player.getYaw()));
-    }
-
-    public void pause() {
-        pauseTimer.reset();
-    }
-
-    private boolean shouldRandomizeDelay() {
-        return randomHitDelay.getValue() && (mc.player.isOnGround() || mc.player.fallDistance < 0.12f || mc.player.isSwimming() || mc.player.isFallFlying());
-    }
-
-    private boolean shouldRandomizeFallDistance() {
-        return randomHitDelay.getValue() && !shouldRandomizeDelay();
-    }
-
-    public static class Position {
-        private double x, y, z;
-        private int ticks;
-
-        public Position(double x, double y, double z) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-        }
-
-        public boolean shouldRemove() {
-            return ticks++ > ModuleManager.aura.backTicks.getValue();
-        }
-
-        public double getX() {
-            return x;
-        }
-
-        public double getY() {
-            return y;
-        }
-
-        public double getZ() {
-            return z;
-
-        }
-    }
-
-    public enum RayTrace {
-        OFF, OnlyTarget, AllEntities
-    }
-
-    public enum Sort {
-        LowestDistance, HighestDistance, LowestHealth, HighestHealth, LowestDurability, HighestDurability, FOV
-    }
-
-    public enum Switch {
-        Normal, None, Silent
-    }
-
-    public enum Resolver {
-        Off, Advantage, Predictive, BackTrack
-    }
-
-    public enum Mode {
-        Interact, Track, Grim, None
-    }
-
-    public enum AttackHand {
-        MainHand, OffHand, None
-    }
-
-    public enum ESP {
-        Off, Lt2GirlHack, NurikZapen, CelkaPasta, Lt2GirlHackV2
-    }
-
-    public enum AccelerateOnHit {
-        Off, Yaw, Pitch, Both
-    }
-
-    public enum WallsBypass {
-        Off, V1, V2
-    }
-}
+           
