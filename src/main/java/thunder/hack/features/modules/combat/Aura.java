@@ -136,7 +136,6 @@ public class Aura extends Module {
     public final Setting<Integer> attackTickLimit = new Setting<>("AttackTickLimit", 11, 0, 20).addToGroup(advanced);
     public final Setting<Float> critFallDistance = new Setting<>("CritFallDistance", 0f, 0f, 1f).addToGroup(advanced);
 
-
     /*   TARGETS   */
     public final Setting<SettingGroup> targets = new Setting<>("Targets", new SettingGroup(false, 0));
     public final Setting<Boolean> Players = new Setting<>("Players", true).addToGroup(targets);
@@ -334,7 +333,6 @@ public class Aura extends Module {
                 prevSlot = mc.player.getInventory().selectedSlot;
             swordResult.switchTo();
         }
-
         return prevSlot;
     }
 
@@ -375,4 +373,4 @@ public class Aura extends Module {
             return;
 
         if (mc.player.isUsingItem() && pauseWhileEating.getValue())
-           
+            r
