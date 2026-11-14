@@ -28,6 +28,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 import thunder.hack.core.Managers;
+import thunder.hack.features.modules.combat.Aura;
 import thunder.hack.core.manager.client.ModuleManager;
 import thunder.hack.core.manager.player.CombatManager;
 import thunder.hack.core.manager.world.CrystalManager;
