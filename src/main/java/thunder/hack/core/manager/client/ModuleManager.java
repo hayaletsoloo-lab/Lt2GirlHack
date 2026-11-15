@@ -165,7 +165,6 @@ public class ModuleManager implements IManager {
     public static AntiCrash antiCrash = new AntiCrash();
     public static AutoGear autoGear = new AutoGear();
     public static ViewLock viewLock = new ViewLock();
-    public static Velocity velocity = new Velocity();
     public static thunder.hack.features.modules.misc.FlagLogger flagLogger = new thunder.hack.features.modules.misc.FlagLogger();
     public static Tooltips tooltips = new Tooltips();
     public static Surround surround = new Surround();
